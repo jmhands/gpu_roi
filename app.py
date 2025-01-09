@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 
-def calculate_monthly_revenue(row, cloud_type, ondemand_ratio, owner_split):
+def calculate_monthly_revenue(row, cloud_type, ondemand_ratio, owner_split, platform_fee):
     """Calculate monthly revenue based on pricing and usage parameters"""
     if cloud_type == 'Community':
         spot_price = row['Community Spot']
@@ -19,8 +19,10 @@ def calculate_monthly_revenue(row, cloud_type, ondemand_ratio, owner_split):
     # Assume 80% utilization (24*30*0.8 = 576 hours per month)
     monthly_revenue = avg_hourly_price * 576
 
-    # Apply owner split
-    return monthly_revenue * (owner_split / 100)
+    # Apply platform fee and owner split
+    monthly_revenue = monthly_revenue * (1 - platform_fee/100) * (owner_split/100)
+
+    return monthly_revenue
 
 def calculate_financial_metrics(purchase_price, monthly_revenue):
     """Calculate ROI metrics"""
@@ -78,6 +80,15 @@ def main():
         # Display Spot ratio for reference
         st.sidebar.info(f'Spot Usage Ratio: {100 - ondemand_ratio * 100:.0f}%')
 
+        # Add platform fee slider in sidebar
+        platform_fee = st.sidebar.slider(
+            'Platform Fee (%)',
+            min_value=0,
+            max_value=100,
+            value=24 if cloud_type == 'Community' else 20,  # Default based on cloud type
+            step=1
+        )
+
         # Get selected GPU data
         gpu_data = df[df['GPU Type'] == selected_gpu].iloc[0]
         purchase_price = gpu_data[' Price NFT ']
@@ -87,7 +98,8 @@ def main():
             gpu_data,
             cloud_type,
             ondemand_ratio,
-            owner_split
+            owner_split,
+            platform_fee
         )
 
         metrics = calculate_financial_metrics(purchase_price, monthly_revenue)
@@ -133,11 +145,11 @@ def main():
 
         # Calculate monthly revenues for spot and on-demand
         if cloud_type == 'Community':
-            spot_revenue = gpu_data['Community Spot'] * 576 * (1 - ondemand_ratio) * (owner_split / 100)
-            ondemand_revenue = gpu_data['Community OnDemand'] * 576 * ondemand_ratio * (owner_split / 100)
+            spot_revenue = gpu_data['Community Spot'] * 576 * (1 - ondemand_ratio) * (1 - platform_fee/100) * (owner_split/100)
+            ondemand_revenue = gpu_data['Community OnDemand'] * 576 * ondemand_ratio * (1 - platform_fee/100) * (owner_split/100)
         else:
-            spot_revenue = gpu_data['Secure Spot'] * 576 * (1 - ondemand_ratio) * (owner_split / 100)
-            ondemand_revenue = gpu_data['Secure OnDemand'] * 576 * ondemand_ratio * (owner_split / 100)
+            spot_revenue = gpu_data['Secure Spot'] * 576 * (1 - ondemand_ratio) * (1 - platform_fee/100) * (owner_split/100)
+            ondemand_revenue = gpu_data['Secure OnDemand'] * 576 * ondemand_ratio * (1 - platform_fee/100) * (owner_split/100)
 
         revenue_df = pd.DataFrame({
             'Type': ['Spot', 'On-Demand'],
