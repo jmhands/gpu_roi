@@ -16,8 +16,8 @@ def calculate_monthly_revenue(row, cloud_type, ondemand_ratio, owner_split, plat
     # Note: spot_ratio is now (1 - ondemand_ratio)
     avg_hourly_price = (spot_price * (1 - ondemand_ratio) + ondemand_price * ondemand_ratio)
 
-    # Assume 80% utilization (24*30*0.8 = 576 hours per month)
-    monthly_revenue = avg_hourly_price * 576
+    # Calculate monthly revenue (24 hours * 30 days = 720 hours per month)
+    monthly_revenue = avg_hourly_price * 720
 
     # Apply platform fee and owner split
     monthly_revenue = monthly_revenue * (1 - platform_fee/100) * (owner_split/100)
@@ -47,16 +47,40 @@ def main():
         # Sidebar controls
         st.sidebar.header('Parameters')
 
-        # GPU Selection
-        selected_gpu = st.sidebar.selectbox(
-            'Select GPU Type',
-            df['GPU Type'].unique()
-        )
-
-        # Cloud Type Selection
+        # Cloud Type Selection (moved before GPU selection)
         cloud_type = st.sidebar.radio(
             'Select Cloud Type',
-            ['Community', 'Secure']
+            ['Community', 'Secure'],
+            index=1  # Default to 'Secure' (index 1)
+        )
+
+        # GPU Category and Selection
+        st.sidebar.subheader('GPU Selection')
+        
+        # First select the GPU category
+        gpu_category = st.sidebar.selectbox(
+            'GPU Category',
+            ['Data Center', 'Consumer', 'Workstation'],
+            index=0  # Default to Data Center
+        )
+        
+        # Filter GPUs based on category
+        filtered_gpus = df[df['Card Type'] == gpu_category]
+        
+        # Set default GPU for each category
+        default_gpus = {
+            'Data Center': 'NVIDIA H100 NVL',
+            'Consumer': 'NVIDIA GeForce RTX 4090',
+            'Workstation': 'NVIDIA RTX 6000 Ada Generation'
+        }
+        
+        # GPU Selection
+        selected_gpu = st.sidebar.selectbox(
+            'GPU Model',
+            filtered_gpus['GPU Type'].unique(),
+            index=filtered_gpus['GPU Type'].unique().tolist().index(default_gpus[gpu_category]) 
+                if default_gpus[gpu_category] in filtered_gpus['GPU Type'].unique().tolist() 
+                else 0
         )
 
         # Owner Split Slider
@@ -91,7 +115,7 @@ def main():
 
         # Get selected GPU data
         gpu_data = df[df['GPU Type'] == selected_gpu].iloc[0]
-        purchase_price = gpu_data[' Price NFT ']
+        purchase_price = gpu_data['Price NFT']
 
         # Calculate metrics
         monthly_revenue = calculate_monthly_revenue(
@@ -144,12 +168,13 @@ def main():
         st.header('Revenue Breakdown')
 
         # Calculate monthly revenues for spot and on-demand
+        hours_per_month = 24 * 30  # 720 hours per month for more accurate calculation
         if cloud_type == 'Community':
-            spot_revenue = gpu_data['Community Spot'] * 576 * (1 - ondemand_ratio) * (1 - platform_fee/100) * (owner_split/100)
-            ondemand_revenue = gpu_data['Community OnDemand'] * 576 * ondemand_ratio * (1 - platform_fee/100) * (owner_split/100)
+            spot_revenue = (gpu_data['Community Spot'] * hours_per_month * (1 - ondemand_ratio)) * (1 - platform_fee/100) * (owner_split/100)
+            ondemand_revenue = (gpu_data['Community OnDemand'] * hours_per_month * ondemand_ratio) * (1 - platform_fee/100) * (owner_split/100)
         else:
-            spot_revenue = gpu_data['Secure Spot'] * 576 * (1 - ondemand_ratio) * (1 - platform_fee/100) * (owner_split/100)
-            ondemand_revenue = gpu_data['Secure OnDemand'] * 576 * ondemand_ratio * (1 - platform_fee/100) * (owner_split/100)
+            spot_revenue = (gpu_data['Secure Spot'] * hours_per_month * (1 - ondemand_ratio)) * (1 - platform_fee/100) * (owner_split/100)
+            ondemand_revenue = (gpu_data['Secure OnDemand'] * hours_per_month * ondemand_ratio) * (1 - platform_fee/100) * (owner_split/100)
 
         revenue_df = pd.DataFrame({
             'Type': ['Spot', 'On-Demand'],
@@ -177,7 +202,16 @@ def main():
 
         scenario_data = []
         for scenario, utilization in utilization_scenarios.items():
-            adjusted_monthly_revenue = monthly_revenue * (utilization / 0.8)
+            # Calculate spot and ondemand revenues separately with utilization factor
+            if cloud_type == 'Community':
+                adjusted_spot_revenue = gpu_data['Community Spot'] * hours_per_month * (1 - ondemand_ratio) * utilization * (1 - platform_fee/100) * (owner_split/100)
+                adjusted_ondemand_revenue = gpu_data['Community OnDemand'] * hours_per_month * ondemand_ratio * utilization * (1 - platform_fee/100) * (owner_split/100)
+            else:
+                adjusted_spot_revenue = gpu_data['Secure Spot'] * hours_per_month * (1 - ondemand_ratio) * utilization * (1 - platform_fee/100) * (owner_split/100)
+                adjusted_ondemand_revenue = gpu_data['Secure OnDemand'] * hours_per_month * ondemand_ratio * utilization * (1 - platform_fee/100) * (owner_split/100)
+
+            adjusted_monthly_revenue = adjusted_spot_revenue + adjusted_ondemand_revenue
+            
             scenario_data.append({
                 'Scenario': scenario,
                 'Monthly Revenue': adjusted_monthly_revenue,
