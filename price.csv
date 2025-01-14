@@ -27,3 +27,4 @@ NVIDIA H100 PCIe,Data Center,23250,,,1.45,2.69
 NVIDIA L4,Data Center,4550,,,0.22,0.43
 NVIDIA L40,Data Center,8250,,,0.5,0.99
 NVIDIA RTX 2000 Ada Generation,Workstation,700,,,0.14,0.28
+NVIDIA GeForce RTX 5090,Consumer,5000,0.3,0.6,0.44,0.89
