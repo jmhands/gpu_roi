@@ -56,30 +56,30 @@ def main():
 
         # GPU Category and Selection
         st.sidebar.subheader('GPU Selection')
-        
+
         # First select the GPU category
         gpu_category = st.sidebar.selectbox(
             'GPU Category',
             ['Data Center', 'Consumer', 'Workstation'],
             index=0  # Default to Data Center
         )
-        
+
         # Filter GPUs based on category
         filtered_gpus = df[df['Card Type'] == gpu_category]
-        
+
         # Set default GPU for each category
         default_gpus = {
             'Data Center': 'NVIDIA H100 NVL',
             'Consumer': 'NVIDIA GeForce RTX 4090',
             'Workstation': 'NVIDIA RTX 6000 Ada Generation'
         }
-        
+
         # GPU Selection
         selected_gpu = st.sidebar.selectbox(
             'GPU Model',
             filtered_gpus['GPU Type'].unique(),
-            index=filtered_gpus['GPU Type'].unique().tolist().index(default_gpus[gpu_category]) 
-                if default_gpus[gpu_category] in filtered_gpus['GPU Type'].unique().tolist() 
+            index=filtered_gpus['GPU Type'].unique().tolist().index(default_gpus[gpu_category])
+                if default_gpus[gpu_category] in filtered_gpus['GPU Type'].unique().tolist()
                 else 0
         )
 
@@ -115,7 +115,21 @@ def main():
 
         # Get selected GPU data
         gpu_data = df[df['GPU Type'] == selected_gpu].iloc[0]
-        purchase_price = gpu_data['Price NFT']
+        default_purchase_price = float(gpu_data['Price NFT'])  # Convert to float
+
+        # Add purchase price override
+        st.sidebar.subheader('Purchase Price')
+        use_custom_price = st.sidebar.checkbox('Override Purchase Price', False)
+        custom_price = st.sidebar.number_input(
+            'Custom Purchase Price ($)',
+            min_value=0.0,
+            value=float(default_purchase_price),  # Ensure float type
+            step=1000.0,
+            disabled=not use_custom_price
+        )
+
+        # Use custom price if override is enabled, otherwise use default
+        purchase_price = custom_price if use_custom_price else default_purchase_price
 
         # Calculate metrics
         monthly_revenue = calculate_monthly_revenue(
@@ -211,7 +225,7 @@ def main():
                 adjusted_ondemand_revenue = gpu_data['Secure OnDemand'] * hours_per_month * ondemand_ratio * utilization * (1 - platform_fee/100) * (owner_split/100)
 
             adjusted_monthly_revenue = adjusted_spot_revenue + adjusted_ondemand_revenue
-            
+
             scenario_data.append({
                 'Scenario': scenario,
                 'Monthly Revenue': adjusted_monthly_revenue,
